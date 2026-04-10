@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeNow Poster Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f5f7;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    .app-header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .app-header svg { width: 28px; height: 28px; }
+    .app-header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.36px; }
+
+    .app-layout {
+      display: flex;
+      height: calc(100vh - 61px);
+    }
+
+    /* ---- Input Panel ---- */
+    .input-panel {
+      width: 380px;
+      min-width: 380px;
+      background: #fff;
+      border-right: 1px solid #e5e5e5;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #999999;
+      margin-bottom: 8px;
+    }
+
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 14px; font-weight: 600; letter-spacing: -0.28px; }
+
+    .text-input {
+      padding: 10px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: -0.3px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .text-input:focus { border-color: #0869D8; }
+
+    .upload-zone {
+      border: 2px dashed #ddd;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-zone:hover { border-color: #0869D8; background: #f0f5ff; }
+    .upload-zone.has-file { border-style: solid; border-color: #0869D8; padding: 8px; }
+    .upload-zone input { display: none; }
+
+    .upload-zone .upload-icon {
+      width: 40px; height: 40px; margin: 0 auto 8px;
+      background: #f0f0f0; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: #999;
+    }
+    .upload-zone .upload-text { font-size: 13px; color: #888; }
+    .upload-zone .upload-text strong { color: #0869D8; }
+
+    .upload-zone img {
+      max-width: 100%;
+      max-height: 80px;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+
+    .upload-zone .remove-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Format Selection */
+    .format-presets {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .format-btn {
+      padding: 8px 4px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.26px;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .format-btn:hover { border-color: #0869D8; }
+    .format-btn.active { border-color: #0869D8; background: #0869D8; color: #fff; }
+    .format-btn .format-size { font-size: 10px; font-weight: 400; opacity: 0.7; display: block; margin-top: 2px; }
+
+    .orientation-toggle {
+      display: flex;
+      border: 1.5px solid #ddd;
+      border-radius: 10px;
+      overflow: visible;
+    }
+    .orientation-btn {
+      flex: 1 1 50%;
+      min-width: 0;
+      padding: 10px 6px;
+      border: none;
+      background: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.26px;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .orientation-btn:first-child { border-radius: 9px 0 0 9px; }
+    .orientation-btn:last-child { border-radius: 0 9px 9px 0; }
+    .orientation-btn.active { background: #0869D8; color: #fff; }
+    .orientation-btn .orient-icon {
+      width: 14px; height: 18px; border: 2px solid currentColor; border-radius: 2px; flex-shrink: 0;
+    }
+    .orientation-btn[data-orient="landscape"] .orient-icon {
+      width: 18px; height: 14px;
+    }
+
+    .custom-size {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .custom-size input {
+      width: 80px;
+      padding: 8px 10px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      text-align: center;
+      outline: none;
+    }
+    .custom-size input:focus { border-color: #0869D8; }
+    .custom-size .x { font-size: 14px; color: #999; font-weight: 600; }
+    .custom-size .unit { font-size: 13px; color: #888; }
+
+    .download-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 20px;
+    }
+
+    .download-btn {
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .download-btn.pdf {
+      background: #0869D8;
+      color: #fff;
+    }
+    .download-btn.pdf:hover { background: #0135E4; }
+    .download-btn.jpg {
+      background: #f0f0f0;
+      color: #1a1a1a;
+    }
+    .download-btn.jpg:hover { background: #e5e5e5; }
+    .download-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ---- Preview Area ---- */
+    .preview-area {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      background: #e8e8ec;
+    }
+
+    .preview-wrapper {
+      box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+      transform-origin: center center;
+    }
+
+    /* ---- Poster Styles ---- */
+    .poster {
+      background: #ffffff;
+      position: relative;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .poster * {
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Portrait Layout */
+    .poster.portrait {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .poster.portrait .poster-top {
+      padding: 4% 6% 0;
+      text-align: center;
+    }
+
+    .poster .safenow-logo-top {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6em;
+      margin-bottom: 3%;
+    }
+
+    .poster .safenow-logo-top svg {
+      width: 3%;
+      min-width: 20px;
+      height: auto;
+    }
+
+    .poster .safenow-logo-top span {
+      font-size: 1.8%;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .poster .headline {
+      font-weight: 900;
+      color: #1a1a1a;
+      line-height: 1.05;
+      margin-bottom: 2%;
+    }
+
+    .poster.portrait .headline {
+      font-size: 5.5%;
+    }
+
+    .poster .subtext {
+      color: #555;
+      line-height: 1.5;
+      max-width: 70%;
+      margin: 0 auto;
+    }
+
+    .poster.portrait .subtext {
+      font-size: 1.8%;
+    }
+
+    .poster.portrait .poster-middle {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2% 4%;
+    }
+
+    .poster .phone-mockup {
+      position: relative;
+      width: 55%;
+      max-width: 400px;
+    }
+
+    .poster .phone-mockup img {
+      width: 100%;
+      height: auto;
+    }
+
+    .poster .phone-overlay {
+      position: absolute;
+      top: 14%;
+      left: 12%;
+      width: 76%;
+      height: 72%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8% 6% 0;
+      overflow: hidden;
+      background: #f0f0f0;
+      border-radius: 4%;
+    }
+
+    .poster .phone-zone-bar {
+      display: flex;
+      align-items: center;
+      gap: 6%;
+      background: #fff;
+      border-radius: 12px;
+      padding: 4% 8%;
+      width: 90%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 8%;
+    }
+
+    .poster .phone-zone-bar .zone-logo {
+      width: 20%;
+      height: auto;
+      max-height: 30px;
+      object-fit: contain;
+    }
+
+    .poster .phone-zone-bar .zone-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .poster .phone-zone-bar .zone-name-display {
+      font-weight: 700;
+      font-size: 70%;
+      color: #1a1a1a;
+    }
+
+    .poster .phone-zone-bar .zone-label {
+      font-size: 50%;
+      color: #0869D8;
+    }
+
+    .poster.portrait .poster-bottom {
+      padding: 0 6% 4%;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .poster .bottom-left {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5em;
+    }
+
+    .poster .initiative-text {
+      font-size: 1.2%;
+      color: #888;
+      min-font-size: 8px;
+    }
+
+    .poster .initiative-logos {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+    }
+
+    .poster .initiative-logos img {
+      height: 2.5%;
+      min-height: 18px;
+      max-height: 35px;
+      object-fit: contain;
+    }
+
+    .poster .initiative-logos .safenow-small {
+      display: flex;
+      align-items: center;
+      gap: 0.3em;
+    }
+
+    .poster .initiative-logos .safenow-small svg {
+      width: 14px; height: 14px;
+    }
+    .poster .initiative-logos .safenow-small span {
+      font-size: 12px; font-weight: 700;
+    }
+
+    .poster .bottom-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.6em;
+    }
+
+    .poster .handwriting {
+      font-style: italic;
+      font-size: 1.4%;
+      color: #1a1a1a;
+      text-align: right;
+      transform: rotate(-5deg);
+      margin-bottom: 0.3em;
+    }
+
+    .poster .qr-code-display {
+      width: 12%;
+      min-width: 60px;
+      max-width: 120px;
+      height: auto;
+    }
+
+    .poster .store-badges {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3em;
+      align-items: flex-end;
+    }
+
+    .poster .store-badges img {
+      height: 2.5%;
+      min-height: 20px;
+      max-height: 32px;
+    }
+
+    .poster .website-text {
+      font-size: 1.1%;
+      color: #888;
+      text-align: right;
+    }
+
+    /* Landscape Layout */
+    .poster.landscape {
+      display: grid;
+      grid-template-columns: 55% 45%;
+      grid-template-rows: 1fr auto;
+    }
+
+    .poster.landscape .poster-top {
+      grid-column: 1;
+      grid-row: 1;
+      padding: 6% 6% 2%;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .poster.landscape .safenow-logo-top {
+      justify-content: flex-start;
+    }
+
+    .poster.landscape .headline {
+      font-size: 5%;
+    }
+
+    .poster.landscape .subtext {
+      font-size: 1.6%;
+      margin: 0;
+      max-width: 90%;
+    }
+
+    .poster.landscape .poster-middle {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 6% 4%;
+    }
+
+    .poster.landscape .phone-mockup {
+      width: 60%;
+    }
+
+    .poster.landscape .poster-right {
+      grid-column: 2;
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6% 6% 4%;
+      align-items: flex-end;
+    }
+
+    .poster.landscape .poster-bottom {
+      display: contents;
+    }
+
+    /* Placeholder styles */
+    .placeholder {
+      color: #ccc;
+      font-style: italic;
+    }
+
+    .logo-placeholder, .qr-placeholder {
+      width: 100%;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f5f5f5;
+      border-radius: 8px;
+      color: #ccc;
+      font-size: 12px;
+    }
+
+    /* Loading overlay */
+    .export-loading {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .export-loading .spinner {
+      background: #fff;
+      padding: 32px 48px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .export-loading .spinner::before {
+      content: '';
+      width: 24px;
+      height: 24px;
+      border: 3px solid #eee;
+      border-top-color: #0869D8;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Sliders */
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #e5e5e5;
+      outline: none;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0869D8;
+      cursor: pointer;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+
+    /* Hidden render target */
+    .render-target {
+      position: fixed;
+      left: -99999px;
+      top: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-header">
+    <svg viewBox="0 0 383 383" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:28px;height:28px;">
+      <rect width="382.163" height="382.163" rx="191.082" fill="url(#snGradH)"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M145.513 251.251L176.38 222.136C161.915 217.427 151.044 205.407 147.828 190.567C144.612 175.726 149.534 160.298 160.756 150.045L212.47 101.267C176.806 91.7129 139.13 107.025 120.302 138.725C101.475 170.425 106.102 210.757 131.622 237.39L145.513 251.251ZM263.07 140.487C266.999 147.55 269.849 155.159 271.527 163.062L271.484 163.125C277.308 189.824 269.437 217.664 250.49 237.39L191.06 296.675L161.419 267.011L218.502 213.148L219.327 212.389C229.959 202.216 234.603 187.302 231.623 172.907C228.642 158.512 218.456 146.657 204.654 141.521L236.114 111.858C247.28 119.094 256.528 128.916 263.07 140.487Z" fill="white"/>
+      <defs><linearGradient id="snGradH" x1="51.59" y1="57.32" x2="321.02" y2="343.95" gradientUnits="userSpaceOnUse"><stop stop-color="#0995FF"/><stop offset="1" stop-color="#0034E3"/></linearGradient></defs>
+    </svg>
+    <h1>SafeNow Poster Generator</h1>
+  </div>
+
+  <div class="app-layout">
+    <!-- Input Panel -->
+    <div class="input-panel">
+      <div class="section-title">Inhalte</div>
+
+      <div class="input-group">
+        <label>Kundenlogo</label>
+        <div class="upload-zone" id="logoUpload" onclick="document.getElementById('logoInput').click()">
+          <input type="file" id="logoInput" accept="image/*">
+          <div class="upload-icon">+</div>
+          <div class="upload-text"><strong>Logo hochladen</strong><br>PNG, JPG oder SVG</div>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>Zonenname</label>
+        <input type="text" class="text-input" id="zoneName" placeholder="z.B. Uniklinik Freiburg">
+      </div>
+
+      <div class="input-group">
+        <label>Headline (2. Zeile)</label>
+        <input type="text" class="text-input" id="headlineText" placeholder="z.B. an der Uniklinik Freiburg">
+      </div>
+
+      <div class="input-group">
+        <label>Headline Breite <span id="headlineWidthVal" style="font-weight:500;color:#999999;">60%</span></label>
+        <input type="range" class="slider" id="headlineWidth" min="20" max="100" value="60" step="1">
+      </div>
+
+      <div class="input-group">
+        <label>QR-Code Link</label>
+        <input type="text" class="text-input" id="qrLink" placeholder="https://safenow.app/...">
+        <button class="format-btn" style="padding:10px;margin-top:4px;background:#0869D8;color:#fff;border-color:#0869D8;" onclick="generateQR()">QR-Code generieren</button>
+      </div>
+
+      <div class="section-title" style="margin-top: 8px;">Format</div>
+
+      <div class="format-presets" id="formatPresets">
+        <button class="format-btn" data-w="594" data-h="841" data-name="A1">A1<span class="format-size">594x841</span></button>
+        <button class="format-btn" data-w="420" data-h="594" data-name="A2">A2<span class="format-size">420x594</span></button>
+        <button class="format-btn active" data-w="297" data-h="420" data-name="A3">A3<span class="format-size">297x420</span></button>
+        <button class="format-btn" data-w="210" data-h="297" data-name="A4">A4<span class="format-size">210x297</span></button>
+        <button class="format-btn" data-w="148" data-h="210" data-name="A5">A5<span class="format-size">148x210</span></button>
+        <button class="format-btn" data-w="105" data-h="148" data-name="A6">A6<span class="format-size">105x148</span></button>
+      </div>
+
+      <div class="orientation-toggle">
+        <button class="orientation-btn active" data-orient="portrait" onclick="setOrientation('portrait')">
+          <div class="orient-icon"></div>
+          Hochformat
+        </button>
+        <button class="orientation-btn" data-orient="landscape" onclick="setOrientation('landscape')">
+          <div class="orient-icon"></div>
+          Querformat
+        </button>
+      </div>
+
+      <div class="input-group">
+        <label>Custom (px)</label>
+        <div class="custom-size">
+          <input type="number" id="customW" placeholder="Breite" min="100">
+          <span class="x">&times;</span>
+          <input type="number" id="customH" placeholder="Hoehe" min="100">
+          <span class="unit">px</span>
+          <button class="format-btn" style="padding: 8px 12px; white-space: nowrap;" onclick="applyCustomSize()">OK</button>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 8px;">Phone-Bild</div>
+
+      <div class="input-group">
+        <label>Drehung <span id="phoneRotVal" style="font-weight:500;color:#999999;">20°</span></label>
+        <input type="range" class="slider" id="phoneRotation" min="-45" max="45" value="20" step="1">
+      </div>
+      <div class="input-group">
+        <label>Groesse <span id="phoneScaleVal" style="font-weight:500;color:#999999;">154%</span></label>
+        <input type="range" class="slider" id="phoneScale" min="50" max="250" value="154" step="1">
+      </div>
+      <div class="input-group">
+        <label>Position X <span id="phonePosXVal" style="font-weight:500;color:#999999;">4%</span></label>
+        <input type="range" class="slider" id="phonePosX" min="-150" max="150" value="4" step="1">
+      </div>
+      <div class="input-group">
+        <label>Position Y <span id="phonePosYVal" style="font-weight:500;color:#999999;">24%</span></label>
+        <input type="range" class="slider" id="phonePosY" min="-150" max="150" value="24" step="1">
+      </div>
+
+      <div class="download-buttons">
+        <button class="download-btn pdf" onclick="exportPDF()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          PDF herunterladen
+        </button>
+        <button class="download-btn jpg" onclick="exportJPG()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          JPG herunterladen
+        </button>
+      </div>
+    </div>
+
+    <!-- Preview Area -->
+    <div class="preview-area" id="previewArea">
+      <div class="preview-wrapper" id="previewWrapper">
+        <!-- Poster gets rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden full-size render target for export -->
+  <div class="render-target" id="renderTarget"></div>
+
+<script>
+  // ---- State ----
+  const DPI = 3.78; // 1mm = 3.78px at 96dpi
+  const EXPORT_SCALE = 3;
+
+  let state = {
+    logoDataUrl: null,
+    zoneName: '',
+    qrDataUrl: null,
+    headlineText: '',
+    headlineWidth: 60,
+    widthMM: 297,
+    heightMM: 420,
+    orientation: 'portrait',
+    formatName: 'A3',
+    isCustom: false,
+    phoneRotation: 20,
+    phoneScale: 154,
+    phonePosX: 4,
+    phonePosY: 24,
+    barPosX: 36,
+    barPosY: -1,
+    barLandPosX: 36,
+    barLandPosY: -1,
+    barLandZoom: 62,
+  };
+
+  const phoneDefaults = {
+    portrait:  { phoneRotation: 20, phoneScale: 154, phonePosX: 4, phonePosY: 24 },
+    landscape: { phoneRotation: 24, phoneScale: 149, phonePosX: -19, phonePosY: 19 },
+  };
+
+  // ---- SafeNow SVG Logo (inline) ----
+  // SafeNow Icon (nur das runde Icon)
+  const safenowIconSVG = `<svg viewBox="0 0 383 383" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="382.163" height="382.163" rx="191.082" fill="url(#snGrad)"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M145.513 251.251L176.38 222.136C161.915 217.427 151.044 205.407 147.828 190.567C144.612 175.726 149.534 160.298 160.756 150.045L212.47 101.267C176.806 91.7129 139.13 107.025 120.302 138.725C101.475 170.425 106.102 210.757 131.622 237.39L145.513 251.251ZM263.07 140.487C266.999 147.55 269.849 155.159 271.527 163.062L271.484 163.125C277.308 189.824 269.437 217.664 250.49 237.39L191.06 296.675L161.419 267.011L218.502 213.148L219.327 212.389C229.959 202.216 234.603 187.302 231.623 172.907C228.642 158.512 218.456 146.657 204.654 141.521L236.114 111.858C247.28 119.094 256.528 128.916 263.07 140.487Z" fill="white"/>
+    <defs><linearGradient id="snGrad" x1="51.59" y1="57.32" x2="321.02" y2="343.95" gradientUnits="userSpaceOnUse"><stop stop-color="#0995FF"/><stop offset="1" stop-color="#0034E3"/></linearGradient></defs>
+  </svg>`;
+
+  // SafeNow Full Logo (Icon + Text)
+  const safenowFullLogoSVG = `<svg viewBox="0 0 1632 383" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="382.163" height="382.163" rx="191.082" fill="url(#snGradFull)"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M145.513 251.251L176.38 222.136C161.915 217.427 151.044 205.407 147.828 190.567C144.612 175.726 149.534 160.298 160.756 150.045L212.47 101.267C176.806 91.7129 139.13 107.025 120.302 138.725C101.475 170.425 106.102 210.757 131.622 237.39L145.513 251.251ZM263.07 140.487C266.999 147.55 269.849 155.159 271.527 163.062L271.484 163.125C277.308 189.824 269.437 217.664 250.49 237.39L191.06 296.675L161.419 267.011L218.502 213.148L219.327 212.389C229.959 202.216 234.603 187.302 231.623 172.907C228.642 158.512 218.456 146.657 204.654 141.521L236.114 111.858C247.28 119.094 256.528 128.916 263.07 140.487Z" fill="white"/>
+    <path d="M613.662 133.575L580.271 144.087C578.828 135.637 574.603 127.907 567.595 120.899C560.587 113.891 550.488 110.387 537.296 110.387C526.372 110.387 517.303 113.479 510.089 119.663C503.081 125.846 499.577 133.266 499.577 141.923C499.577 156.97 508.131 166.348 525.238 170.058L556.774 176.551C575.737 180.261 590.371 187.784 600.677 199.12C610.982 210.457 616.135 223.957 616.135 239.622C616.135 257.76 609.127 273.425 595.112 286.616C581.302 299.602 562.442 306.094 538.533 306.094C512.768 306.094 492.672 299.395 478.244 285.998C463.816 272.394 455.674 256.626 453.819 238.694L488.447 228.801C489.683 241.168 494.63 251.577 503.287 260.027C511.944 268.478 523.693 272.703 538.533 272.703C551.312 272.703 561.102 269.921 567.904 264.356C574.912 258.585 578.416 251.267 578.416 242.404C578.416 235.19 575.84 229.007 570.687 223.854C565.534 218.495 558.32 214.785 549.045 212.724L518.127 206.231C501.02 202.727 487.416 195.616 477.317 184.898C467.423 174.18 462.476 160.783 462.476 144.706C462.476 126.361 469.793 110.594 484.428 97.4022C499.062 84.2108 516.582 77.6151 536.987 77.6151C560.278 77.6151 578.107 83.2833 590.474 94.6196C602.841 105.75 610.57 118.735 613.662 133.575Z" fill="black"/>
+    <path d="M627.113 260.646C627.113 247.867 631.235 237.664 639.48 230.038C647.93 222.205 658.958 217.258 672.561 215.197L711.208 209.323C718.628 208.292 722.338 204.685 722.338 198.502C722.338 191.7 719.968 186.238 715.227 182.116C710.486 177.787 703.376 175.623 693.894 175.623C684.825 175.623 677.611 178.199 672.252 183.352C666.893 188.299 663.801 194.792 662.977 202.83L630.204 195.41C631.647 181.806 638.14 170.264 649.682 160.783C661.225 151.095 675.859 146.252 693.585 146.252C715.433 146.252 731.51 151.507 741.816 162.019C752.328 172.531 757.584 186.032 757.584 202.521V277.341C757.584 287.235 758.202 295.273 759.439 301.457H726.048C725.018 298.365 724.502 291.975 724.502 282.288C714.609 298.159 699.15 306.094 678.126 306.094C662.874 306.094 650.507 301.663 641.026 292.8C631.75 283.731 627.113 273.013 627.113 260.646ZM684.928 277.959C696.058 277.959 705.024 274.971 711.826 268.993C718.834 262.81 722.338 252.813 722.338 239.004V232.202L683.073 238.076C669.676 240.343 662.977 247.145 662.977 258.481C662.977 263.84 664.935 268.478 668.851 272.394C672.767 276.104 678.126 277.959 684.928 277.959Z" fill="black"/>
+    <path d="M851.085 108.223C845.108 108.223 839.852 109.975 835.317 113.479C830.989 116.777 828.825 122.651 828.825 131.102V150.889H863.761V182.116H828.825V301.457H792.651V182.116H766.372V150.889H792.651V130.175C792.651 113.479 797.495 100.288 807.183 90.6004C816.87 80.9129 829.546 76.0692 845.211 76.0692C853.662 76.0692 859.948 77.0998 864.071 79.1609V109.769C860.567 108.739 856.238 108.223 851.085 108.223Z" fill="black"/>
+    <path d="M903.532 209.632H977.425C977.012 200.151 973.611 192.215 967.222 185.826C961.038 179.436 952.072 176.241 940.324 176.241C929.606 176.241 920.949 179.642 914.353 186.444C907.757 193.04 904.15 200.769 903.532 209.632ZM981.444 248.897L1011.74 258.481C1007.41 272.291 999.273 283.731 987.318 292.8C975.569 301.663 961.038 306.094 943.725 306.094C922.289 306.094 904.047 298.777 889.001 284.143C874.161 269.509 866.74 249.928 866.74 225.4C866.74 202.315 873.955 183.352 888.383 168.512C903.017 153.672 920.227 146.252 940.014 146.252C963.099 146.252 981.135 153.363 994.12 167.585C1007.11 181.6 1013.6 200.563 1013.6 224.472C1013.6 230.862 1013.29 234.675 1012.67 235.912H902.605C903.017 247.248 907.139 256.626 914.971 264.047C923.01 271.467 932.594 275.177 943.725 275.177C963.099 275.177 975.672 266.417 981.444 248.897Z" fill="black"/>
+    <path d="M1218.73 301.457H1180.08L1071.87 135.43V301.457H1034.77V82.2527H1082.07L1181.63 237.767V82.2527H1218.73V301.457Z" fill="black"/>
+    <path d="M1282.85 261.264C1291.09 269.715 1301.09 273.94 1312.84 273.94C1324.59 273.94 1334.48 269.715 1342.52 261.264C1350.76 252.813 1354.89 241.065 1354.89 226.018C1354.89 211.178 1350.76 199.635 1342.52 191.391C1334.48 182.94 1324.59 178.715 1312.84 178.715C1301.09 178.715 1291.09 182.94 1282.85 191.391C1274.81 199.635 1270.79 211.178 1270.79 226.018C1270.79 240.859 1274.81 252.607 1282.85 261.264ZM1312.84 146.252C1335.51 146.252 1354.16 153.775 1368.8 168.821C1383.64 183.868 1391.06 202.933 1391.06 226.018C1391.06 249.103 1383.64 268.272 1368.8 283.524C1354.16 298.571 1335.51 306.094 1312.84 306.094C1290.37 306.094 1271.72 298.571 1256.88 283.524C1242.24 268.272 1234.93 249.103 1234.93 226.018C1234.93 202.933 1242.24 183.868 1256.88 168.821C1271.72 153.775 1290.37 146.252 1312.84 146.252Z" fill="black"/>
+    <path d="M1491.97 150.889H1529.07L1564.62 255.081L1594.61 150.889H1631.1L1582.87 301.457H1547L1509.59 193.246L1473.11 301.457H1436.32L1387.47 150.889H1425.8L1456.41 255.081L1491.97 150.889Z" fill="black"/>
+    <defs><linearGradient id="snGradFull" x1="51.59" y1="57.32" x2="321.02" y2="343.95" gradientUnits="userSpaceOnUse"><stop stop-color="#0995FF"/><stop offset="1" stop-color="#0034E3"/></linearGradient></defs>
+  </svg>`;
+
+  function escapeXml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Zone bar SVG matching the original Helpers Information.svg design
+  function getZoneBarSVG(logoUrl, zoneName) {
+    const name = escapeXml(zoneName || 'Dein Standort');
+    const logoImage = logoUrl
+      ? `<g clip-path="url(#zoneLogoClip)">
+           <rect x="256" y="256" width="238" height="238" fill="white"/>
+           <image href="${logoUrl}" x="256" y="256" width="238" height="238" preserveAspectRatio="xMidYMid slice"/>
+         </g>
+         <rect x="254" y="254" width="242" height="242" rx="70" stroke="black" stroke-opacity="0.05" stroke-width="4.2"/>`
+      : `<rect x="256" y="256" width="238" height="238" rx="68" fill="#f0f0f0"/>
+         <rect x="254" y="254" width="242" height="242" rx="70" stroke="black" stroke-opacity="0.05" stroke-width="4.2"/>`;
+
+    return `<svg viewBox="0 50 1638 650" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;overflow:visible;">
+      <defs>
+        <filter id="barShadow" x="-10%" y="-10%" width="120%" height="140%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="28"/>
+        </filter>
+        <clipPath id="zoneLogoClip">
+          <rect x="256" y="256" width="238" height="238" rx="68" fill="white"/>
+        </clipPath>
+      </defs>
+      <!-- Shadow rect only -->
+      <rect x="218" y="228" width="1202" height="315" rx="107" fill="rgba(0,0,0,0.08)" filter="url(#barShadow)"/>
+      <!-- White bar -->
+      <rect x="218" y="218" width="1202" height="315" rx="107" fill="white"/>
+      ${logoImage}
+      <text x="545" y="360" font-family="Inter,sans-serif" font-weight="600" font-size="72" fill="#1a1a1a">${name}</text>
+      <text x="545" y="425" font-family="Inter,sans-serif" font-weight="400" font-size="48" fill="#999999">SafeNow Zone</text>
+    </svg>`;
+  }
+
+  // ---- Render Poster ----
+  function renderPoster(container, scale) {
+    const isLandscape = state.orientation === 'landscape';
+    const wPx = Math.round(state.widthMM * DPI * (scale || 1));
+    const hPx = Math.round(state.heightMM * DPI * (scale || 1));
+
+    const actualW = isLandscape ? Math.max(wPx, hPx) : Math.min(wPx, hPx);
+    const actualH = isLandscape ? Math.min(wPx, hPx) : Math.max(wPx, hPx);
+
+    const ref = Math.sqrt(actualW * actualH); // proportional reference based on poster area
+
+    const zoneName = state.zoneName || 'Dein Standort';
+    const headlineLine2 = state.headlineText || '';
+    const logoHtml = state.logoDataUrl
+      ? `<img src="${state.logoDataUrl}" style="max-height:${ref * 0.035}px; max-width:${ref * 0.12}px; object-fit:contain;">`
+      : `<span style="color:#ccc;font-size:${ref * 0.012}px;">[ Logo ]</span>`;
+    const qrHtml = state.qrDataUrl
+      ? `<img src="${state.qrDataUrl}" style="width:${ref * 0.1}px; height:${ref * 0.1}px; object-fit:contain;">`
+      : `<div style="width:${ref * 0.1}px;height:${ref * 0.1}px;background:#f0f0f0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:${ref * 0.012}px;">QR Code</div>`;
+    const fs = (pct) => Math.max(10, ref * pct / 100);
+    const ls = (pct) => { const size = fs(pct); return (size > 18 ? -0.036 : -0.02) * size; }; // -3.6% for headlines, -2% for body/labels
+    const pad = (pct) => actualW * pct / 100;
+    const font = `'Inter',sans-serif`;
+    const phoneW = ref * (state.phoneScale / 100);
+    const phonePxX = ref * (state.phonePosX / 100);
+    const phonePxY = ref * (state.phonePosY / 100);
+    const phoneTransform = `rotate(${state.phoneRotation}deg) scale(${state.phoneScale / 100})`;
+
+    if (!isLandscape) {
+      // Portrait layout
+      container.innerHTML = `
+        <div style="width:${actualW}px;height:${actualH}px;background:#fff;position:relative;overflow:hidden;font-family:${font};">
+          <!-- Top Section -->
+          <div style="padding:${pad(8)}px ${pad(6)}px 0;text-align:center;position:relative;z-index:2;">
+            <!-- SafeNow Logo -->
+            <div style="display:flex;justify-content:center;margin-bottom:${actualH * 0.05}px;">
+              <img src="safenow-logo.svg" style="height:${fs(2.8)}px;">
+            </div>
+            <!-- Headline -->
+            <div style="font-size:${fs(5)}px;font-weight:600;color:#1a1a1a;line-height:1.05;letter-spacing:${ls(5)}px;margin-bottom:${actualH * 0.02}px;max-width:${state.headlineWidth}%;margin-left:auto;margin-right:auto;">
+              Eine App f&uuml;r Deine Sicherheit ${escapeXml(headlineLine2)}
+            </div>
+            <!-- Subtext -->
+            <div style="font-size:${fs(2.2)}px;font-weight:500;color:#666666;line-height:1.5;letter-spacing:${ls(2.2)}px;max-width:70%;margin:0 auto;">
+              Ab jetzt kannst du unser Sicherheitspersonal direkt erreichen. Und zwar per Knopfdruck, schnell und unauff&auml;llig.
+            </div>
+          </div>
+
+          <!-- Phone with Hand (real PNG) -->
+          <div style="position:absolute;bottom:0;left:50%;width:${ref * 0.55}px;transform-origin:center center;transform:translateX(calc(-50% + ${phonePxX}px)) translateY(${phonePxY}px) ${phoneTransform};z-index:1;">
+            <div style="position:relative;">
+              <img src="phone-hand.png" style="width:100%;height:auto;display:block;">
+              <!-- Dynamic zone bar overlay (SVG matching original design) -->
+              <div style="position:absolute;top:${state.barPosY}%;left:${state.barPosX}%;transform:translateX(-50%);width:62%;">
+                ${getZoneBarSVG(state.logoDataUrl, zoneName)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Right: QR -->
+          <div style="position:absolute;bottom:${actualH * 0.04}px;right:${pad(5)}px;display:flex;flex-direction:column;align-items:flex-end;gap:${actualH * 0.01}px;">
+            ${qrHtml}
+            <div style="font-size:${fs(1)}px;font-weight:500;color:#999999;letter-spacing:${ls(1)}px;">www.safenow.app</div>
+          </div>
+
+          <!-- Bottom Left: Initiative -->
+          <div style="position:absolute;bottom:${actualH * 0.04}px;left:${pad(5)}px;display:flex;flex-direction:column;gap:${actualH * 0.006}px;">
+            <div style="font-size:${fs(1)}px;font-weight:500;color:#999999;letter-spacing:${ls(1)}px;">Eine Initiative von:</div>
+            <div style="display:flex;align-items:center;gap:${actualW * 0.02}px;">
+              ${logoHtml}
+              <img src="safenow-logo.svg" style="height:${fs(1.6)}px;">
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Landscape layout
+      container.innerHTML = `
+        <div style="width:${actualW}px;height:${actualH}px;background:#fff;position:relative;overflow:hidden;font-family:${font};display:grid;grid-template-columns:55% 45%;grid-template-rows:1fr;">
+          <!-- Left Column -->
+          <div style="display:flex;flex-direction:column;padding:${pad(4)}px ${pad(4)}px ${pad(3)}px;">
+            <!-- SafeNow Logo -->
+            <div style="display:flex;margin-bottom:${actualH * 0.05}px;">
+              <img src="safenow-logo.svg" style="height:${fs(3.2)}px;">
+            </div>
+            <!-- Headline -->
+            <div style="font-size:${fs(6)}px;font-weight:600;color:#1a1a1a;line-height:1.05;letter-spacing:${ls(6)}px;margin-bottom:${actualH * 0.03}px;max-width:${state.headlineWidth}%;">
+              Eine App f&uuml;r Deine Sicherheit ${escapeXml(headlineLine2)}
+            </div>
+            <!-- Subtext -->
+            <div style="font-size:${fs(2)}px;font-weight:500;color:#666666;line-height:1.5;letter-spacing:${ls(2)}px;max-width:85%;margin-bottom:auto;">
+              Ab jetzt kannst du unser Sicherheitspersonal<br>direkt erreichen. Und zwar per Knopfdruck,<br>schnell und unauff&auml;llig.
+            </div>
+            <!-- Initiative bottom left -->
+            <div style="display:flex;flex-direction:column;gap:${actualH * 0.012}px;margin-top:${actualH * 0.03}px;">
+              <div style="font-size:${fs(1.3)}px;font-weight:500;color:#999999;letter-spacing:${ls(1.3)}px;">Eine Initiative von:</div>
+              <div style="display:flex;align-items:center;gap:${actualW * 0.015}px;">
+                ${logoHtml}
+                <img src="safenow-logo.svg" style="height:${fs(1.8)}px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div style="display:flex;position:relative;overflow:visible;">
+            <!-- Phone with Hand -->
+            <div style="position:absolute;bottom:0;left:50%;width:${ref * 0.55}px;transform-origin:center center;transform:translateX(calc(-50% + ${phonePxX}px)) translateY(${phonePxY}px) ${phoneTransform};">
+              <div style="position:relative;">
+                <img src="phone-hand.png" style="width:100%;height:auto;display:block;">
+                <!-- Dynamic zone bar (SVG matching original design) -->
+                <div style="position:absolute;top:${state.barLandPosY}%;left:${state.barLandPosX}%;transform:translateX(-50%);width:${state.barLandZoom}%;">
+                  ${getZoneBarSVG(state.logoDataUrl, zoneName)}
+                </div>
+              </div>
+            </div>
+            <!-- QR -->
+            <div style="position:absolute;bottom:${actualH * 0.06}px;right:${pad(4)}px;display:flex;flex-direction:column;align-items:flex-end;gap:${actualH * 0.015}px;">
+              ${qrHtml}
+              <div style="font-size:${fs(1.2)}px;font-weight:500;color:#999999;letter-spacing:${ls(1.2)}px;">www.safenow.app</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // ---- Update Preview ----
+  function updatePreview() {
+    const wrapper = document.getElementById('previewWrapper');
+    const area = document.getElementById('previewArea');
+
+    renderPoster(wrapper, 1);
+
+    // Scale to fit preview area
+    const areaW = area.clientWidth - 64;
+    const areaH = area.clientHeight - 64;
+    const isLandscape = state.orientation === 'landscape';
+    const posterW = state.widthMM * DPI;
+    const posterH = state.heightMM * DPI;
+    const actualW = isLandscape ? Math.max(posterW, posterH) : Math.min(posterW, posterH);
+    const actualH = isLandscape ? Math.min(posterW, posterH) : Math.max(posterW, posterH);
+
+    const scaleX = areaW / actualW;
+    const scaleY = areaH / actualH;
+    const scale = Math.min(scaleX, scaleY, 1);
+
+    wrapper.style.transform = `scale(${scale})`;
+    wrapper.style.width = `${actualW}px`;
+    wrapper.style.height = `${actualH}px`;
+  }
+
+  // ---- File Upload Handlers ----
+  function setupUpload(zoneId, inputId, stateKey) {
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+
+    input.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleFile(e.target.files[0], zoneId, stateKey);
+    });
+
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.borderColor = '#0869D8'; });
+    zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.style.borderColor = '';
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0], zoneId, stateKey);
+    });
+  }
+
+  function handleFile(file, zoneId, stateKey) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state[stateKey] = e.target.result;
+      const zone = document.getElementById(zoneId);
+      zone.classList.add('has-file');
+      zone.innerHTML = `
+        <img src="${e.target.result}">
+        <button class="remove-btn" onclick="event.stopPropagation();removeFile('${zoneId}','${stateKey}','${zoneId === 'logoUpload' ? 'logoInput' : 'qrInput'}')">&times;</button>
+      `;
+      updatePreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeFile(zoneId, stateKey, inputId) {
+    state[stateKey] = null;
+    document.getElementById(inputId).value = '';
+    const zone = document.getElementById(zoneId);
+    zone.classList.remove('has-file');
+    const isLogo = stateKey === 'logoDataUrl';
+    zone.innerHTML = `
+      <input type="file" id="${inputId}" accept="image/*">
+      <div class="upload-icon">+</div>
+      <div class="upload-text"><strong>${isLogo ? 'Logo hochladen' : 'QR-Code hochladen'}</strong><br>${isLogo ? 'PNG, JPG oder SVG' : 'PNG oder JPG'}</div>
+    `;
+    setupUpload(zoneId, inputId, stateKey);
+    updatePreview();
+  }
+
+  // ---- Format Selection ----
+  document.querySelectorAll('.format-btn[data-w]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.format-btn[data-w]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.widthMM = parseInt(btn.dataset.w);
+      state.heightMM = parseInt(btn.dataset.h);
+      state.formatName = btn.dataset.name;
+      state.isCustom = false;
+      document.getElementById('customW').value = '';
+      document.getElementById('customH').value = '';
+      updatePreview();
+    });
+  });
+
+  function setOrientation(orient) {
+    state.orientation = orient;
+    document.querySelectorAll('.orientation-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.orient === orient);
+    });
+    // Apply phone defaults for this orientation
+    const def = phoneDefaults[orient];
+    Object.assign(state, def);
+    document.getElementById('phoneRotation').value = def.phoneRotation;
+    document.getElementById('phoneRotVal').textContent = def.phoneRotation + '\u00B0';
+    document.getElementById('phoneScale').value = def.phoneScale;
+    document.getElementById('phoneScaleVal').textContent = def.phoneScale + '%';
+    document.getElementById('phonePosX').value = def.phonePosX;
+    document.getElementById('phonePosXVal').textContent = def.phonePosX + '%';
+    document.getElementById('phonePosY').value = def.phonePosY;
+    document.getElementById('phonePosYVal').textContent = def.phonePosY + '%';
+    updatePreview();
+  }
+
+  function applyCustomSize() {
+    const w = parseInt(document.getElementById('customW').value);
+    const h = parseInt(document.getElementById('customH').value);
+    if (w >= 100 && h >= 100) {
+      // Convert px to mm (assuming 96dpi)
+      state.widthMM = Math.round(w / DPI);
+      state.heightMM = Math.round(h / DPI);
+      state.formatName = `${w}x${h}px`;
+      state.isCustom = true;
+      state.orientation = w > h ? 'landscape' : 'portrait';
+      document.querySelectorAll('.format-btn[data-w]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.orientation-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.orient === state.orientation);
+      });
+      updatePreview();
+    }
+  }
+
+  // ---- Zone Name ----
+  document.getElementById('zoneName').addEventListener('input', (e) => {
+    state.zoneName = e.target.value;
+    updatePreview();
+  });
+  document.getElementById('headlineText').addEventListener('input', (e) => {
+    state.headlineText = e.target.value;
+    updatePreview();
+  });
+
+  // ---- Export Functions ----
+  function showLoading(text) {
+    const el = document.createElement('div');
+    el.className = 'export-loading';
+    el.innerHTML = `<div class="spinner">${text}</div>`;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  async function exportJPG() {
+    const loading = showLoading('JPG wird erstellt...');
+    const target = document.getElementById('renderTarget');
+
+    try {
+      renderPoster(target, EXPORT_SCALE);
+      const posterEl = target.firstElementChild;
+
+      const canvas = await html2canvas(posterEl, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: parseInt(posterEl.style.width),
+        height: parseInt(posterEl.style.height),
+      });
+
+      const link = document.createElement('a');
+      const name = state.zoneName || 'Poster';
+      link.download = `SafeNow_Plakat_${name.replace(/\s+/g, '_')}_${state.formatName}.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Export fehlgeschlagen. Bitte versuche es erneut.');
+    } finally {
+      target.innerHTML = '';
+      loading.remove();
+    }
+  }
+
+  async function exportPDF() {
+    const loading = showLoading('PDF wird erstellt...');
+    const target = document.getElementById('renderTarget');
+
+    try {
+      renderPoster(target, EXPORT_SCALE);
+      const posterEl = target.firstElementChild;
+
+      const canvas = await html2canvas(posterEl, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: parseInt(posterEl.style.width),
+        height: parseInt(posterEl.style.height),
+      });
+
+      const { jsPDF } = window.jspdf;
+      const isLandscape = state.orientation === 'landscape';
+      const pdfW = isLandscape ? Math.max(state.widthMM, state.heightMM) : Math.min(state.widthMM, state.heightMM);
+      const pdfH = isLandscape ? Math.min(state.widthMM, state.heightMM) : Math.max(state.widthMM, state.heightMM);
+
+      const pdf = new jsPDF({
+        orientation: isLandscape ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pdfW, pdfH],
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+
+      const name = state.zoneName || 'Poster';
+      pdf.save(`SafeNow_Plakat_${name.replace(/\s+/g, '_')}_${state.formatName}.pdf`);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Export fehlgeschlagen. Bitte versuche es erneut.');
+    } finally {
+      target.innerHTML = '';
+      loading.remove();
+    }
+  }
+
+  // ---- Phone Sliders ----
+  function setupSlider(id, stateKey, valId, suffix) {
+    const slider = document.getElementById(id);
+    const valEl = document.getElementById(valId);
+    slider.addEventListener('input', () => {
+      state[stateKey] = parseInt(slider.value);
+      valEl.textContent = slider.value + suffix;
+      updatePreview();
+    });
+  }
+  setupSlider('phoneRotation', 'phoneRotation', 'phoneRotVal', '\u00B0');
+  setupSlider('phoneScale', 'phoneScale', 'phoneScaleVal', '%');
+  setupSlider('phonePosX', 'phonePosX', 'phonePosXVal', '%');
+  setupSlider('phonePosY', 'phonePosY', 'phonePosYVal', '%');
+  setupSlider('headlineWidth', 'headlineWidth', 'headlineWidthVal', '%');
+  // ---- Init ----
+  setupUpload('logoUpload', 'logoInput', 'logoDataUrl');
+  // QR Code generation from link (using qrcodejs)
+  function generateQR() {
+    const url = document.getElementById('qrLink').value.trim();
+    if (!url) { state.qrDataUrl = null; updatePreview(); return; }
+    try {
+      // Create a temporary hidden div for QRCode to render into
+      const tmpDiv = document.createElement('div');
+      tmpDiv.style.cssText = 'position:fixed;left:-9999px;top:0;';
+      document.body.appendChild(tmpDiv);
+      const qr = new QRCode(tmpDiv, {
+        text: url,
+        width: 512,
+        height: 512,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H,
+      });
+      // QRCode renders async via canvas, grab it after a tick
+      setTimeout(() => {
+        const canvas = tmpDiv.querySelector('canvas');
+        if (canvas) {
+          state.qrDataUrl = canvas.toDataURL('image/png');
+          updatePreview();
+        }
+        document.body.removeChild(tmpDiv);
+      }, 100);
+    } catch (err) {
+      console.error('QR generation failed:', err);
+      alert('QR-Code konnte nicht generiert werden. Bitte pruefe den Link.');
+    }
+  }
+  // Also generate on Enter key
+  document.getElementById('qrLink').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') generateQR();
+  });
+
+  // Default QR code
+  document.getElementById('qrLink').value = 'https://go.safenow.app/general';
+  generateQR();
+
+  updatePreview();
+
+  // Resize handler
+  window.addEventListener('resize', updatePreview);
+
+  // Custom size enter key
+  document.getElementById('customH').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') applyCustomSize();
+  });
+</script>
+
+</body>
+</html>
